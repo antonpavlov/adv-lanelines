@@ -2,7 +2,7 @@
 # Plan:
 # Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
 # Apply a distortion correction to raw images.
-# TODO:Use color transforms, gradients, etc., to create a thresholded binary image.
+# Use color transforms, gradients, etc., to create a thresholded binary image.
 # TODO:Apply a perspective transform to rectify binary image ("birds-eye view").
 # TODO:Detect lane pixels and fit to find the lane boundary.
 # TODO:Determine the curvature of the lane and vehicle position with respect to center.
@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 
 
 def calibration():
+    # TODO: Ignore calibration1.jpg to 6 files.
     """
     Camera calibration function for compensation of radial and tangential distortions. [1]
     This function receives a calibration chess board image and number of inside corner in it. The return values are
@@ -58,15 +59,17 @@ def calibration():
 
     for idx, fname in enumerate(images):
         # Open an input image
-        input_image = cv2.imread(fname)
+        image = cv2.imread(fname)
 
         # Convert to grayscale
-        gray = cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         # Find the chessboard corners
         success_flag = False  # Let's assume that there is no corners and function below fails
         ret, corners = cv2.findChessboardCorners(gray, (nx, ny), None)
 
+        cal_mtx = []
+        cal_dist = []
         # If found, draw corners
         if ret is True:
             success_flag = True
@@ -77,30 +80,201 @@ def calibration():
             cal_ret, cal_mtx, cal_dist, cal_rvecs, cal_tvecs = cv2.calibrateCamera(object_points,
                                                                                image_points,
                                                                                gray.shape[::-1], None, None)
-        else:
-            cal_mtx = 0
-            cal_dist = 0
-
     return success_flag, cal_mtx, cal_dist
+
+
+def absolute_sobel_threshold(img, orient='x', thresh_min=0, thresh_max=255):
+    """
+    Description pending
+
+    Args:
+        none:
+
+    Returns:
+        none:
+    """
+    # Convert to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+
+    sobel = cv2.Sobel(gray, cv2.CV_64F, 1, 0)  # Just assume default 'x', correct after. Yeap, it's not so elegant...
+
+    # Take the derivative in x or y given orient = 'x' or 'y'
+    if orient == 'x':
+        sobel = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
+    elif orient == 'y':
+        sobel = cv2.Sobel(gray, cv2.CV_64F, 0, 1)
+    else:
+        raise Exception("Wrong orientation parameter!")
+
+    # Take the absolute value of the derivative or gradient
+    abs_sobel = np.absolute(sobel)
+
+    # Scale to 8-bit (0 - 255) then convert to type = np.uint8
+    scaled_sobel = np.uint8(255 * abs_sobel / np.max(abs_sobel))
+
+    # Create a mask of 1's where the scaled gradient magnitude
+    # is > thresh_min and < thresh_max
+    binary_output = np.zeros_like(scaled_sobel)
+    binary_output[(scaled_sobel >= thresh_min) & (scaled_sobel <= thresh_max)] = 1
+
+    return binary_output
+
+
+def magnitude_threshold(img, sobel_kernel=3, mag_thresh=(0, 255)):
+    """
+    Description pending
+
+    Args:
+        none:
+
+    Returns:
+        none:
+    """
+    # Convert to grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    # Take both Sobel x and y gradients
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
+    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
+    # Calculate the gradient magnitude
+    gradmag = np.sqrt(sobelx ** 2 + sobely ** 2)
+    # Rescale to 8 bit
+    scale_factor = np.max(gradmag) / 255
+    gradmag = (gradmag / scale_factor).astype(np.uint8)
+    # Create a binary image of ones where threshold is met, zeros otherwise
+    binary_output = np.zeros_like(gradmag)
+    binary_output[(gradmag >= mag_thresh[0]) & (gradmag <= mag_thresh[1])] = 1
+
+    # Return the binary image
+    return binary_output
+
+
+def direction_threshold(img, sobel_kernel=3, thresh=(0, np.pi / 2)):
+    """
+    Description pending
+
+    Args:
+        none:
+
+    Returns:
+        none:
+    """
+    # Grayscale
+    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    # Calculate the x and y gradients
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
+    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
+    # Take the absolute value of the gradient direction,
+    # apply a threshold, and create a binary image result
+    absgraddir = np.arctan2(np.absolute(sobely), np.absolute(sobelx))
+    binary_output = np.zeros_like(absgraddir)
+    binary_output[(absgraddir >= thresh[0]) & (absgraddir <= thresh[1])] = 1
+
+    # Return the binary image
+    return binary_output
+
+
+def hlscolor_threshold(img, thresh=(0, 255)):
+    """
+    Description pending
+
+    Args:
+        none:
+
+    Returns:
+        none:
+    """
+    hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
+    s_channel = hls[:, :, 2]
+    binary_output = np.zeros_like(s_channel)
+    binary_output[(s_channel > thresh[0]) & (s_channel <= thresh[1])] = 1
+    return binary_output
+
+
+def combined_threshold(input_image):
+    """
+    Description pending
+
+    Args:
+        none:
+
+    Returns:
+        none:
+    """
+    absolute_binary = absolute_sobel_threshold(input_image, orient='x', thresh_min=50, thresh_max=255)
+    magnitude_binary = magnitude_threshold(input_image, sobel_kernel=3, mag_thresh=(50, 255))
+    direction_binary = direction_threshold(input_image, sobel_kernel=15, thresh=(0.7, 1.3))
+    hlscolor_binary = hlscolor_threshold(input_image, thresh=(170, 255))
+    combine_all_binary = np.zeros_like(dir_binary)
+    combine_all_binary[(absolute_binary == 1 | ((magnitude_binary == 1)
+                                                & (direction_binary == 1))) | hlscolor_binary == 1] = 1
+    return combine_all_binary
 
 
 if __name__ == "__main__":
 
+    DEBUG = False  # Save all intermediate images
+
     # Calibrate camera
-    success_flag, mtx, dist = calibration()
-    if success_flag is False:
+    s_flag, mtx, dist = calibration()
+    if s_flag is False:
         raise Exception('Calibration function failed!')
 
     # Read input images from folder
     test_images = glob.glob('./test_images/*.jpg')
 
-    for idx, fname in enumerate(test_images):
+    for idx, f_name in enumerate(test_images):
         # Undistort the image
-        input_image = cv2.imread(fname)
+        input_image = cv2.imread(f_name)
+
+        if DEBUG is True:
+            # Save input file for comparison purposes after
+            ax1 = plt.imshow(input_image)
+            ax1 = plt.savefig(f_name[:-4] + '_A_processed.png')
+
         undist_image = cv2.undistort(input_image, mtx, dist, None, mtx)
 
-        # Tests if undistort works
-        #ax1 = plt.imshow(input_image)
-        #ax1 = plt.savefig(fname[:-4] + '_processed.png')
-        #ax2 = plt.imshow(undist_image)
-        #ax2 = plt.savefig(fname[:-4] + '_undistorted.png')
+        if DEBUG is True:
+            # Tests of undistort function
+            ax2 = plt.imshow(undist_image)
+            ax2 = plt.savefig(f_name[:-4] + '_B_undistort.png')
+
+        # Use color transforms, gradients, etc., to create a thresholded binary image.
+        # Absolute horizontal Sobel operator on the image
+        grad_binary = absolute_sobel_threshold(undist_image, orient='x', thresh_min=20, thresh_max=100)
+
+        if DEBUG is True:
+            # Tests of abs_sobel_thresh function
+            ax3 = plt.imshow(grad_binary)
+            ax3 = plt.savefig(f_name[:-4] + '_C_abs_sobel_thresh.png')
+
+        # Sobel operator in both horizontal and vertical directions and calculate its magnitude
+        mag_binary = magnitude_threshold(undist_image, sobel_kernel=3, mag_thresh=(30, 100))
+
+        if DEBUG is True:
+            # Tests of mag_thresh function
+            ax4 = plt.imshow(mag_binary)
+            ax4 = plt.savefig(f_name[:-4] + '_D_mag_thresh.png')
+
+        # Sobel operator to calculate the direction of the gradient
+        dir_binary = direction_threshold(undist_image, sobel_kernel=15, thresh=(0.7, 1.3))
+
+        if DEBUG is True:
+            # Tests of dir_threshold function
+            ax5 = plt.imshow(dir_binary)
+            ax5 = plt.savefig(f_name[:-4] + '_E_dir_binary.png')
+
+        # Convert the image from RGB space to HLS space, and threshold the S channel
+        hls_binary = hlscolor_threshold(undist_image, thresh=(90, 255))
+
+        if DEBUG is True:
+            # Tests of hls_select function
+            ax6 = plt.imshow(hls_binary)
+            ax6 = plt.savefig(f_name[:-4] + '_F_hls_select.png')
+
+        # Combine the above binary images to create the final binary image
+        combined_binary = combined_threshold(undist_image)
+
+        if DEBUG is True:
+            # Tests of hls_select function
+            ax7 = plt.imshow(combined_binary)
+            ax7 = plt.savefig(f_name[:-4] + '_G_combined_thresh.png')
