@@ -15,6 +15,8 @@ import cv2
 import glob
 import matplotlib.pyplot as plt
 
+from moviepy.editor import VideoFileClip
+
 
 def calibration():
     # TODO: Ignore calibration1.jpg to 6 files.
@@ -190,7 +192,7 @@ def hlscolor_threshold(img, thresh=(0, 255)):
     return binary_output
 
 
-def combined_threshold(input_image):
+def all_combined_threshold(input_image):
     """
     Description pending
 
@@ -210,11 +212,49 @@ def combined_threshold(input_image):
     return combine_all_binary
 
 
+def perspective_transform(img):
+    """
+    Execute perspective transform
+    """
+    img_size = (img.shape[1], img.shape[0])
+
+    src = np.float32(
+         [[200, 720],
+         [1100, 720],
+         [595, 450],
+         [685, 450]])
+    dst = np.float32(
+         [[300, 720],
+         [980, 720],
+         [300, 0],
+         [980, 0]])
+
+    m = cv2.getPerspectiveTransform(src, dst)
+    m_inv = cv2.getPerspectiveTransform(dst, src)
+
+    warped = cv2.warpPerspective(img, m, img_size, flags=cv2.INTER_LINEAR)
+    unwarped = cv2.warpPerspective(warped, m_inv, (warped.shape[1], warped.shape[0]), flags=cv2.INTER_LINEAR)  # DEBUG
+
+    return warped
+
+
+def process_image(image):
+    undist_image = cv2.undistort(image, mtx, dist, None, mtx)
+    combined_binary = all_combined_threshold(undist_image)
+    warped_image = perspective_transform(combined_binary)
+
+    return warped_image
+
+
+global mtx, dist
+
+
 if __name__ == "__main__":
 
     DEBUG = False  # Save all intermediate images
 
     # Calibrate camera
+    # global mtx, dist
     s_flag, mtx, dist = calibration()
     if s_flag is False:
         raise Exception('Calibration function failed!')
@@ -272,9 +312,25 @@ if __name__ == "__main__":
             ax6 = plt.savefig(f_name[:-4] + '_F_hls_select.png')
 
         # Combine the above binary images to create the final binary image
-        combined_binary = combined_threshold(undist_image)
+        combined_binary = all_combined_threshold(undist_image)
 
         if DEBUG is True:
             # Tests of hls_select function
             ax7 = plt.imshow(combined_binary)
             ax7 = plt.savefig(f_name[:-4] + '_G_combined_thresh.png')
+
+        # Apply a perspective transform to rectify binary image ("birds-eye view")
+        warped_image = perspective_transform(combined_binary)
+
+        if DEBUG is True:
+            # Tests of hls_select function
+            ax8 = plt.imshow(warped_image)
+            ax8 = plt.savefig(f_name[:-4] + '_H_perspective.png')
+    # End of the FOR loop of a sequence of test images
+
+    # Process video
+    video_input = VideoFileClip("./videos/project_video.mp4")  # .subclip(0,5)
+    video_output = 'videos/OUTPUT_VIDEO.mp4'
+
+    white_clip = video_input.fl_image(process_image)
+    white_clip.write_videofile(video_output, audio=False)
