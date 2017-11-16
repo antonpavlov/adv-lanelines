@@ -230,22 +230,22 @@ def perspective_transform(img):
          [980, 0]])
 
     m = cv2.getPerspectiveTransform(src, dst)
-    m_inv = cv2.getPerspectiveTransform(dst, src)
 
     warped = cv2.warpPerspective(img, m, img_size, flags=cv2.INTER_LINEAR)
-    unwarped = cv2.warpPerspective(warped, m_inv, (warped.shape[1], warped.shape[0]), flags=cv2.INTER_LINEAR)  # DEBUG
 
     return warped
 
 
 def process_image(image):
     undist_image = cv2.undistort(image, mtx, dist, None, mtx)
+    #ax = plt.imshow(undist_image)
+    #ax = plt.savefig('undist_image.png')
     combined_binary = all_combined_threshold(undist_image)
-    warped_image = perspective_transform(combined_binary)
+    #bx = plt.imshow(combined_binary)
+    #bx = plt.savefig('combined_binary.png')
+    return combined_binary
 
-    return warped_image
-
-
+# Define global variables of calibration coefficients
 global mtx, dist
 
 
@@ -254,7 +254,6 @@ if __name__ == "__main__":
     DEBUG = False  # Save all intermediate images
 
     # Calibrate camera
-    # global mtx, dist
     s_flag, mtx, dist = calibration()
     if s_flag is False:
         raise Exception('Calibration function failed!')
@@ -329,8 +328,10 @@ if __name__ == "__main__":
     # End of the FOR loop of a sequence of test images
 
     # Process video
-    video_input = VideoFileClip("./videos/project_video.mp4")  # .subclip(0,5)
+    video_input = VideoFileClip("videos/project_video.mp4").subclip(0, 5)
     video_output = 'videos/OUTPUT_VIDEO.mp4'
 
-    white_clip = video_input.fl_image(process_image)
-    white_clip.write_videofile(video_output, audio=False)
+    output_clip = video_input.fl_image(process_image)
+    output_clip.write_videofile(video_output, audio=False)
+
+
