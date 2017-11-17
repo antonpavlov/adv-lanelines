@@ -238,12 +238,15 @@ def perspective_transform(img):
 
 def process_image(image):
     undist_image = cv2.undistort(image, mtx, dist, None, mtx)
-    #ax = plt.imshow(undist_image)
-    #ax = plt.savefig('undist_image.png')
     combined_binary = all_combined_threshold(undist_image)
-    #bx = plt.imshow(combined_binary)
-    #bx = plt.savefig('combined_binary.png')
-    return combined_binary
+
+    # Debug - does not work
+    #blank_image = np.zeros((720, 1280, 3), np.uint8)
+    #blank_image[:, :, 0] = combined_binary
+    #blank_image[:, :, 1] = 255
+    #blank_image[:, :, 2] = 255
+    return undist_image
+
 
 # Define global variables of calibration coefficients
 global mtx, dist
@@ -328,10 +331,10 @@ if __name__ == "__main__":
     # End of the FOR loop of a sequence of test images
 
     # Process video
-    video_input = VideoFileClip("videos/project_video.mp4").subclip(0, 5)
-    video_output = 'videos/OUTPUT_VIDEO.mp4'
+    #video_input = VideoFileClip("videos/project_video.mp4").subclip(0, 5)
+    #video_output = 'videos/OUTPUT_VIDEO.mp4'#
 
-    output_clip = video_input.fl_image(process_image)
-    output_clip.write_videofile(video_output, audio=False)
+    #output_clip = video_input.fl_image(process_image)
+    #output_clip.write_videofile(video_output, audio=False)
 
 
