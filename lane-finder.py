@@ -3,9 +3,9 @@
 # Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
 # Apply a distortion correction to raw images.
 # Use color transforms, gradients, etc., to create a thresholded binary image.
-# TODO:Apply a perspective transform to rectify binary image ("birds-eye view").
-# TODO:Detect lane pixels and fit to find the lane boundary.
-# TODO:Determine the curvature of the lane and vehicle position with respect to center.
+# Apply a perspective transform to rectify binary image ("birds-eye view").
+# Detect lane pixels and fit to find the lane boundary.
+# Determine the curvature of the lane and vehicle position with respect to center.
 # TODO:Warp the detected lane boundaries back onto the original image.
 # TODO:Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
@@ -19,33 +19,20 @@ from moviepy.editor import VideoFileClip
 
 
 def calibration():
-    # TODO: Ignore calibration1.jpg to 6 files.
     """
-    Camera calibration function for compensation of radial and tangential distortions. [1]
-    This function receives a calibration chess board image and number of inside corner in it. The return values are
-    a flag of function execution status, camera matrix, and distortion coefficients;
-
-    Args:
-        none: Calibration function is developed for specific camera and specific calibration pictures. All input
-              parameters like nx and ny are hardcoded. Provided images have the following nx/ny coefficients:
-              ./camera_cal/calibration1.jpg nx=9 ny=5
-              ./camera_cal/calibration2.jpg nx=9 ny=6
-              ./camera_cal/calibration3.jpg nx=9 ny=6
-              ./camera_cal/calibration4.jpg nx=5 ny=6
-              ./camera_cal/calibration5.jpg nx=7 ny=6
-              ./camera_cal/calibration6.jpg nx=9 ny=6
-              ...
-              ./camera_cal/calibration20.jpg nx=9 ny=6
-              Calibration function won't work if nx and ny are incorrect. There is no homogeneity among nx and ny on
-              the first 5 images. That's why we are going to use images calibration6.jpg to calibration20.jpg.
-
-    Returns:
-        success_flag: True for success, False otherwise.
-        cal_mtx: Camera matrix
-        cal_dist:  Distortion coefficients
-
-    [1]: https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_calib3d/py_calibration/py_calibration.html
+    Camera calibration function for compensation of radial and tangential distortions.
+    :return: Success flag and correction coefficients
+    Ref: Course notes and https://docs.opencv.org/3.0-beta/doc/py_tutorials/py_calib3d/py_calibration/py_calibration.html
     """
+    # ./camera_cal/calibration1.jpg nx=9 ny=5
+    # ./camera_cal/calibration2.jpg nx=9 ny=6
+    # ./camera_cal/calibration3.jpg nx=9 ny=6
+    # ./camera_cal/calibration4.jpg nx=5 ny=6
+    # ./camera_cal/calibration5.jpg nx=7 ny=6
+    # ./camera_cal/calibration6.jpg nx=9 ny=6
+    # ...
+    # ./camera_cal/calibration20.jpg nx=9 ny=6
+
     # Setup object points
     nx = 9  # Internal corners on horizontal
     ny = 6  # Internal corners on vertical
@@ -60,46 +47,54 @@ def calibration():
     images = glob.glob('./camera_cal/calibration*.jpg')
 
     for idx, fname in enumerate(images):
-        # Open an input image
-        image = cv2.imread(fname)
 
-        # Convert to grayscale
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # Skip three files nx and ny should be 9 and 6 only
+        if fname == './camera_cal/calibration1.jpg':
+            #print("Break!")  # Debug
+            pass
+        elif fname == './camera_cal/calibration4.jpg':
+            #print("Break!")  # Debug
+            pass
+        elif fname == './camera_cal/calibration5.jpg':
+            #print("Break!")  # Debug
+            pass
+        else:
+            # Open an input image
+            image = cv2.imread(fname)
 
-        # Find the chessboard corners
-        success_flag = False  # Let's assume that there is no corners and function below fails
-        ret, corners = cv2.findChessboardCorners(gray, (nx, ny), None)
+            # Convert to grayscale
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        cal_mtx = []
-        cal_dist = []
-        # If found, draw corners
-        if ret is True:
-            success_flag = True
-            image_points.append(corners)
-            object_points.append(object_point)
+            # Find the chessboard corners
+            ret, corners = cv2.findChessboardCorners(gray, (nx, ny), None)
 
-            # Calibrate camera
-            cal_ret, cal_mtx, cal_dist, cal_rvecs, cal_tvecs = cv2.calibrateCamera(object_points,
+            cal_mtx = []
+            cal_dist = []
+            # If found, draw corners
+            if ret is True:
+                success_flag = True
+                image_points.append(corners)
+                object_points.append(object_point)
+
+                # Calibrate camera
+                cal_ret, cal_mtx, cal_dist, cal_rvecs, cal_tvecs = cv2.calibrateCamera(object_points,
                                                                                image_points,
                                                                                gray.shape[::-1], None, None)
-    return success_flag, cal_mtx, cal_dist
+        # End of FOR loop
+    return cal_mtx, cal_dist
 
 
 def absolute_sobel_threshold(img, orient='x', thresh=(0, 255)):
     """
-    Description pending
-
-    Args:
-        none:
-
-    Returns:
-        none:
+    Application of Sobel operator on undistorted image
+    :param img: Undistorted image
+    :param orient: Direction of gradient
+    :param thresh: Default threshold tuple
+    :return: Thresholded binary image
+    Ref: Course notes
     """
     # Convert to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-
-    #sobel = cv2.Sobel(gray, cv2.CV_64F, 1, 0)  # Just assume default 'x', correct after. Yeap, it's not so elegant...
-
     # Take the derivative in x or y given orient = 'x' or 'y'
     if orient == 'x':
         sobel = cv2.Sobel(gray, cv2.CV_64F, 1, 0)
@@ -118,19 +113,17 @@ def absolute_sobel_threshold(img, orient='x', thresh=(0, 255)):
     # is > thresh_min and < thresh_max
     result = np.zeros_like(scaled_sobel)
     result[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 1
-
     return result
 
 
 def magnitude_threshold(img, sobel_kernel=3, mag_thresh=(0, 255)):
     """
-    Description pending
-
-    Args:
-        none:
-
-    Returns:
-        none:
+    Filter an image by gradient magnitude in both (x and y) directions
+    :param img: Undistorted image
+    :param sobel_kernel: A kernel size of Sobel transform
+    :param mag_thresh: Default threshold tuple
+    :return: Thresholded binary image
+    Ref: Course notes
     """
     # Convert to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
@@ -145,20 +138,17 @@ def magnitude_threshold(img, sobel_kernel=3, mag_thresh=(0, 255)):
     # Create a binary image of ones where threshold is met, zeros otherwise
     result = np.zeros_like(gradmag)
     result[(gradmag >= mag_thresh[0]) & (gradmag <= mag_thresh[1])] = 1
-
-    # Return the binary image
     return result
 
 
 def direction_threshold(img, sobel_kernel=3, thresh=(0, np.pi / 2)):
     """
-    Description pending
-
-    Args:
-        none:
-
-    Returns:
-        none:
+    Filter an image considering gradient orientation
+    :param img: Undistorted image
+    :param sobel_kernel: A kernel size of Sobel transform
+    :param thresh: Default threshold tuple
+    :return: Thresholded binary image
+    Ref: Course notes
     """
     # Grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
@@ -170,52 +160,35 @@ def direction_threshold(img, sobel_kernel=3, thresh=(0, np.pi / 2)):
     absgraddir = np.arctan2(np.absolute(sobely), np.absolute(sobelx))
     result = np.zeros_like(absgraddir)
     result[(absgraddir >= thresh[0]) & (absgraddir <= thresh[1])] = 1
-
-    # Return the binary image
     return result
 
 
 def hlscolor_threshold(img, thresh=(0, 255)):
     """
-    Description pending
-
-    Args:
-        none:
-
-    Returns:
-        none:
+    HLS color space threshold
+    :param img: Undistorted image
+    :param thresh: Default threshold values
+    :return: Thresholded binary image
+    Ref: Course notes
     """
     hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
     s_channel = hls[:, :, 2]
-    binary_output = np.zeros_like(s_channel)
-    binary_output[(s_channel > thresh[0]) & (s_channel <= thresh[1])] = 1
-    return binary_output
+    result = np.zeros_like(s_channel)
+    result[(s_channel > thresh[0]) & (s_channel <= thresh[1])] = 1
+    return result
 
 
 def all_combined_threshold(input_image):
     """
-    Description pending
-
-    Args:
-        none:
-
-    Returns:
-        none:
+    Apply all thresholds to undistorted image
+    :param input_image: Undistorted image
+    :return: Combined binary image
+    Ref: Course notes
     """
-    #absolute_binary = absolute_sobel_threshold(input_image, orient='x', thresh_min=50, thresh_max=255)
-    #magnitude_binary = magnitude_threshold(input_image, sobel_kernel=3, mag_thresh=(50, 255))
-    #direction_binary = direction_threshold(input_image, sobel_kernel=15, thresh=(0.7, 1.3))
-    #hlscolor_binary = hlscolor_threshold(input_image, thresh=(170, 255))
-    #combine_all_binary = np.zeros_like(dir_binary)
-    #combine_all_binary[(absolute_binary == 1 | ((magnitude_binary == 1)
-    #                                            & (direction_binary == 1))) | hlscolor_binary == 1] = 1
+    # Sobel kernel size
+    ksize = 3  # Should be an odd number to smooth a gradient
 
-    # Choose a Sobel kernel size
-    ksize = 3  # Choose a larger odd number to smooth gradient measurements
-
-    # Apply each of the thresholding functions
     absolute_binary = absolute_sobel_threshold(input_image, orient='x', thresh=(50, 255))
-    #grady = absolute_sobel_threshold(input_image, orient='y', thresh=(50, 255))
     magnitude_binary = magnitude_threshold(input_image, sobel_kernel=ksize, mag_thresh=(50, 255))
     direction_binary = direction_threshold(input_image, sobel_kernel=ksize, thresh=(0.7, 1.3))
     hlscolor_binary = hlscolor_threshold(input_image, thresh=(170, 255))
@@ -226,9 +199,11 @@ def all_combined_threshold(input_image):
     return combine_all_binary
 
 
-def perspective_transform(img):
+def perspective_warp(img):
     """
-    Execute perspective transform
+    Execute perspective transform; warp in image
+    :param img: Filtered image
+    :return: Warped image and perspective transform results
     """
     img_size = (img.shape[1], img.shape[0])
 
@@ -244,26 +219,46 @@ def perspective_transform(img):
          [980, 0]])
 
     m = cv2.getPerspectiveTransform(src, dst)
-    minv = cv2.getPerspectiveTransform(dst, src)
+    m_inv = cv2.getPerspectiveTransform(dst, src)
 
     warped = cv2.warpPerspective(img, m, img_size, flags=cv2.INTER_LINEAR)
 
-    return warped, m, minv
+    return warped, m, m_inv
 
 
-def process_image(image):
-    undist_image = cv2.undistort(image, mtx, dist, None, mtx)
-    combined_binary = all_combined_threshold(undist_image)
+def perspective_restore(img):
+    """
+    Execute perspective transform; resotre in image
+    :param img: Filtered image
+    :return: Restored image and perspective transform resultss
+    """
+    img_size = (img.shape[1], img.shape[0])
 
-    # Debug - does not work
-    #blank_image = np.zeros((720, 1280, 3), np.uint8)
-    #blank_image[:, :, 0] = combined_binary
-    #blank_image[:, :, 1] = 255
-    #blank_image[:, :, 2] = 255
-    return combined_binary
+    dst = np.float32(
+         [[200, 720],
+         [1100, 720],
+         [595, 450],
+         [685, 450]])
+    src = np.float32(
+         [[300, 720],
+         [980, 720],
+         [300, 0],
+         [980, 0]])
+
+    m = cv2.getPerspectiveTransform(src, dst)
+    m_inv = cv2.getPerspectiveTransform(dst, src)
+
+    restored_image = cv2.warpPerspective(img, m, img_size, flags=cv2.INTER_LINEAR)
+
+    return restored_image, m, m_inv
 
 
 def find_lanes(binary_warped):
+    """
+
+    :param binary_warped:
+    :return:
+    """
     # Assuming you have created a warped binary image called "binary_warped"
     # Take a histogram of the bottom half of the image
     histogram = np.sum(binary_warped[int(binary_warped.shape[0] / 2):, :], axis=0)
@@ -348,6 +343,13 @@ def find_lanes(binary_warped):
 
 
 def find_lanes_secondary(binary_warped, left_fit, right_fit):
+    """
+
+    :param binary_warped: Filtered by combined thresholds image
+    :param left_fit: Left lane boundary
+    :param right_fit: Right lane boundary
+    :return:
+    """
     # Assume you now have a new warped binary image
     # from the next frame of video (also called "binary_warped")
     # It's now much easier to find line pixels!
@@ -403,7 +405,17 @@ def find_lanes_secondary(binary_warped, left_fit, right_fit):
 
     return result, left_fit, right_fit
 
+
 def curvature_calc(lanes_left_fitx, lanes_right_fitx, ploty):
+    """
+    Calculation of lane curvature for both boundaries
+    :param lanes_left_fitx:
+    :param lanes_right_fitx:
+    :param ploty: an image prototype
+    :return: values of the left and right lane curvature in meters
+    Ref: Course notes
+    """
+    # TODO: Update comments
     # Fit a second order polynomial to pixel positions in each fake lane line
     left_fit = np.polyfit(ploty, lanes_left_fitx, 2)
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
@@ -424,11 +436,26 @@ def curvature_calc(lanes_left_fitx, lanes_right_fitx, ploty):
         2 * left_fit_cr[0])
     right_curverad = ((1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(
         2 * right_fit_cr[0])
-    # Now our radius of curvature is in meters
+
     return left_curverad, right_curverad
 
 
-def draw_over(color_warp, undist, lanes_left_fitx, lanes_right_fitx, ploty, Minv):
+def draw_over(warped, undist, lanes_left_fitx, lanes_right_fitx, ploty, Minv):
+    """
+    Draw results of processing over original image
+    :param warped: Warped image
+    :param undist: Undistorted image
+    :param lanes_left_fitx: Lane lines data
+    :param lanes_right_fitx: Lane lines data
+    :param ploty: An image prototype
+    :param Minv: Inverse perspective transform
+    :return: Resulting image
+    Ref: Course notes
+    """
+    # Create an image to draw the lines on
+    warp_zero = np.zeros_like(warped).astype(np.uint8)
+    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+
     # Recast the x and y points into usable format for cv2.fillPoly()
     pts_left = np.array([np.transpose(np.vstack([lanes_left_fitx, ploty]))])
     pts_right = np.array([np.flipud(np.transpose(np.vstack([lanes_right_fitx, ploty])))])
@@ -439,16 +466,21 @@ def draw_over(color_warp, undist, lanes_left_fitx, lanes_right_fitx, ploty, Minv
 
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
     newwarp = cv2.warpPerspective(color_warp, Minv, (1280, 720))
-    img_new_warp = np.array(cv2.merge((newwarp, newwarp, newwarp)),np.uint8)
-    # Combine the result with the original image
-    result = cv2.addWeighted(undist, 1, img_new_warp, 0.3, 0)
 
+    # Combine the result with the original image
+    result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
     return result
 
 
-def calc_vehicle_offset(undist, left_fit, right_fit):
+def find_vehicle_offset(undist, left_fit, right_fit):
     """
     Calculate vehicle offset from lane center, in meters
+    :param undist: undistorted image
+    :param left_fit: Left lane boundary
+    :param right_fit: Right lane boundary
+    :return: value of vehicle offset within the lane in meters
+
+    Ref: https://github.com/georgesung/advanced_lane_detection
     """
     # Calculate vehicle center offset in pixels
     bottom_y = undist.shape[0] - 1
@@ -463,6 +495,22 @@ def calc_vehicle_offset(undist, left_fit, right_fit):
     return vehicle_offset
 
 
+def process_image(image):
+    """
+    Video processing function
+    :param image: frame image
+    :return: processed image
+    """
+    # TODO: This is incomplete. Update this function for correct video processing
+    undist_image = cv2.undistort(image, mtx, dist, None, mtx)
+    combined_binary = all_combined_threshold(undist_image)
+
+    # Debug
+    #blank_image = np.zeros((720, 1280, 3), np.uint8)
+    #blank_image[:, :, 0] = combined_binary
+    #blank_image[:, :, 1] = combined_binary
+    #blank_image[:, :, 2] = combined_binary
+    return combined_binary
 
 # Define global variables of calibration coefficients
 global mtx, dist
@@ -473,9 +521,7 @@ if __name__ == "__main__":
     DEBUG = True  # Save all intermediate images
 
     # Calibrate camera
-    s_flag, mtx, dist = calibration()
-    if s_flag is False:
-        raise Exception('Calibration function failed!')
+    mtx, dist = calibration()
 
     # Read input images from folder
     test_images = glob.glob('./test_images/*.jpg')
@@ -545,7 +591,7 @@ if __name__ == "__main__":
             ax7 = plt.savefig(f_name[:-4] + '_G_combined_thresh.png')
 
         # Apply a perspective transform to rectify binary image ("birds-eye view")
-        warped_image, M, Minv = perspective_transform(combined_binary)
+        warped_image, M, Minv = perspective_warp(combined_binary)
 
         if DEBUG is True:
             # Tests of hls_select function
@@ -558,7 +604,6 @@ if __name__ == "__main__":
 
         if DEBUG is True:
             # Tests of hls_select function
-            #ploty = np.linspace(0, warped_image.shape[0] - 1, warped_image.shape[0])
             ax9 = plt.clf()
             ax9 = plt.imshow(lanes_img)
             ax9 = plt.plot(lanes_left_fitx, ploty, color='yellow')
@@ -569,8 +614,8 @@ if __name__ == "__main__":
 
         # Curvature calculation
         left_curve, right_curve = curvature_calc(lanes_left_fitx, lanes_right_fitx, ploty)
-        print("Filename: ", f_name, " Left:", left_curve, " Right:", right_curve)
-        # TODO: calculate an average of both values
+        curve_avg = (left_curve + right_curve) / 2
+        print("Filename: ", f_name, " Left:", left_curve, " Right:", right_curve, " Average:", curve_avg)
 
         # Draw lanes over undistorted image
         img_lanes = draw_over(warped_image, undist_image, lanes_left_fitx, lanes_right_fitx, ploty, Minv)
@@ -578,13 +623,13 @@ if __name__ == "__main__":
         if DEBUG is True:
             # Tests of hls_select function
             ax10 = plt.clf()
-            ax10 = plt.imshow(warped_image)
+            ax10 = plt.imshow(img_lanes)
             ax10 = plt.savefig(f_name[:-4] + '_J_withLanes.png')
 
         # Find lanes - secondary function
 
         # Vehicle offset
-        offset = calc_vehicle_offset(undist_image, left_fit, right_fit)
+        offset = find_vehicle_offset(undist_image, left_fit, right_fit)
         print("Filename: ", f_name, " Vehicle offset: ", offset)
 
         #    if DEBUG is True:
