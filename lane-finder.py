@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# Advanced Lane Finding - Udacity Self-Driving Car Engineer Nanodegree - Fall 2018
 # Plan:
 # Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
 # Apply a distortion correction to raw images.
@@ -6,8 +7,8 @@
 # Apply a perspective transform to rectify binary image ("birds-eye view").
 # Detect lane pixels and fit to find the lane boundary.
 # Determine the curvature of the lane and vehicle position with respect to center.
-# TODO:Warp the detected lane boundaries back onto the original image.
-# TODO:Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
+# Warp the detected lane boundaries back onto the original image.
+# Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
 # Imports
 import numpy as np
@@ -48,7 +49,7 @@ def calibration():
 
     for idx, fname in enumerate(images):
 
-        # Skip three files nx and ny should be 9 and 6 only
+        # Skip following files; nx and ny should be 9 and 6 only
         if fname == './camera_cal/calibration1.jpg':
             #print("Break!")  # Debug
             pass
@@ -80,7 +81,7 @@ def calibration():
                 cal_ret, cal_mtx, cal_dist, cal_rvecs, cal_tvecs = cv2.calibrateCamera(object_points,
                                                                                image_points,
                                                                                gray.shape[::-1], None, None)
-        # End of FOR loop
+    # End of FOR loop
     return cal_mtx, cal_dist
 
 
@@ -110,7 +111,7 @@ def absolute_sobel_threshold(img, orient='x', thresh=(0, 255)):
     scaled_sobel = np.uint8(255 * abs_sobel / np.max(abs_sobel))
 
     # Create a mask of 1's where the scaled gradient magnitude
-    # is > thresh_min and < thresh_max
+    # is equal or more than thresh_min and less than thresh_max
     result = np.zeros_like(scaled_sobel)
     result[(scaled_sobel >= thresh[0]) & (scaled_sobel <= thresh[1])] = 1
     return result
@@ -127,14 +128,18 @@ def magnitude_threshold(img, sobel_kernel=3, mag_thresh=(0, 255)):
     """
     # Convert to grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+
     # Take both Sobel x and y gradients
     sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
     sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
+
     # Calculate the gradient magnitude
     gradmag = np.sqrt(sobelx ** 2 + sobely ** 2)
+
     # Rescale to 8 bit
     scale_factor = np.max(gradmag) / 255
     gradmag = (gradmag / scale_factor).astype(np.uint8)
+
     # Create a binary image of ones where threshold is met, zeros otherwise
     result = np.zeros_like(gradmag)
     result[(gradmag >= mag_thresh[0]) & (gradmag <= mag_thresh[1])] = 1
@@ -152,14 +157,16 @@ def direction_threshold(img, sobel_kernel=3, thresh=(0, np.pi / 2)):
     """
     # Grayscale
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+
     # Calculate the x and y gradients
     sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
     sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
+
     # Take the absolute value of the gradient direction,
     # apply a threshold, and create a binary image result
-    absgraddir = np.arctan2(np.absolute(sobely), np.absolute(sobelx))
-    result = np.zeros_like(absgraddir)
-    result[(absgraddir >= thresh[0]) & (absgraddir <= thresh[1])] = 1
+    absolute_gradient_direction = np.arctan2(np.absolute(sobely), np.absolute(sobelx))
+    result = np.zeros_like(absolute_gradient_direction)
+    result[(absolute_gradient_direction >= thresh[0]) & (absolute_gradient_direction <= thresh[1])] = 1
     return result
 
 
@@ -188,10 +195,13 @@ def all_combined_threshold(input_image):
     # Sobel kernel size
     ksize = 3  # Should be an odd number to smooth a gradient
 
+    # Apply threshold functions
     absolute_binary = absolute_sobel_threshold(input_image, orient='x', thresh=(50, 255))
     magnitude_binary = magnitude_threshold(input_image, sobel_kernel=ksize, mag_thresh=(50, 255))
     direction_binary = direction_threshold(input_image, sobel_kernel=ksize, thresh=(0.7, 1.3))
     hlscolor_binary = hlscolor_threshold(input_image, thresh=(170, 255))
+
+    # Combine threshold results in one binary image
     combine_all_binary = np.zeros_like(dir_binary)
     combine_all_binary[(absolute_binary == 1 | ((magnitude_binary == 1)
                                                 & (direction_binary == 1))) | hlscolor_binary == 1] = 1
@@ -204,6 +214,7 @@ def perspective_warp(img):
     Execute perspective transform; warp in image
     :param img: Filtered image
     :return: Warped image and perspective transform results
+    Ref: https://github.com/georgesung/advanced_lane_detection
     """
     img_size = (img.shape[1], img.shape[0])
 
@@ -212,6 +223,7 @@ def perspective_warp(img):
          [1100, 720],
          [595, 450],
          [685, 450]])
+
     dst = np.float32(
          [[300, 720],
          [980, 720],
@@ -226,38 +238,12 @@ def perspective_warp(img):
     return warped, m, m_inv
 
 
-def perspective_restore(img):
-    """
-    Execute perspective transform; resotre in image
-    :param img: Filtered image
-    :return: Restored image and perspective transform resultss
-    """
-    img_size = (img.shape[1], img.shape[0])
-
-    dst = np.float32(
-         [[200, 720],
-         [1100, 720],
-         [595, 450],
-         [685, 450]])
-    src = np.float32(
-         [[300, 720],
-         [980, 720],
-         [300, 0],
-         [980, 0]])
-
-    m = cv2.getPerspectiveTransform(src, dst)
-    m_inv = cv2.getPerspectiveTransform(dst, src)
-
-    restored_image = cv2.warpPerspective(img, m, img_size, flags=cv2.INTER_LINEAR)
-
-    return restored_image, m, m_inv
-
-
 def find_lanes(binary_warped):
     """
-
-    :param binary_warped:
-    :return:
+    Find lanes in a binary warped image
+    :param binary_warped: Undistorted and warped image
+    :return: An image and data of lane location within the output image
+    Ref: Course notes
     """
     # Assuming you have created a warped binary image called "binary_warped"
     # Take a histogram of the bottom half of the image
@@ -338,72 +324,7 @@ def find_lanes(binary_warped):
     out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
 
     ploty = np.linspace(0, warped_image.shape[0] - 1, warped_image.shape[0])
-
     return out_img, left_fitx, right_fitx, ploty, left_fit, right_fit
-
-
-def find_lanes_secondary(binary_warped, left_fit, right_fit):
-    """
-
-    :param binary_warped: Filtered by combined thresholds image
-    :param left_fit: Left lane boundary
-    :param right_fit: Right lane boundary
-    :return:
-    """
-    # Assume you now have a new warped binary image
-    # from the next frame of video (also called "binary_warped")
-    # It's now much easier to find line pixels!
-    nonzero = binary_warped.nonzero()
-    nonzeroy = np.array(nonzero[0])
-    nonzerox = np.array(nonzero[1])
-    margin = 100
-    left_lane_inds = ((nonzerox > (left_fit[0] * (nonzeroy ** 2) + left_fit[1] * nonzeroy +
-                                   left_fit[2] - margin)) & (nonzerox < (left_fit[0] * (nonzeroy ** 2) +
-                                                                         left_fit[1] * nonzeroy + left_fit[
-                                                                             2] + margin)))
-
-    right_lane_inds = ((nonzerox > (right_fit[0] * (nonzeroy ** 2) + right_fit[1] * nonzeroy +
-                                    right_fit[2] - margin)) & (nonzerox < (right_fit[0] * (nonzeroy ** 2) +
-                                                                           right_fit[1] * nonzeroy + right_fit[
-                                                                               2] + margin)))
-
-    # Again, extract left and right line pixel positions
-    leftx = nonzerox[left_lane_inds]
-    lefty = nonzeroy[left_lane_inds]
-    rightx = nonzerox[right_lane_inds]
-    righty = nonzeroy[right_lane_inds]
-    # Fit a second order polynomial to each
-    left_fit = np.polyfit(lefty, leftx, 2)
-    right_fit = np.polyfit(righty, rightx, 2)
-    # Generate x and y values for plotting
-    ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
-    left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
-    right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
-
-    # Create an image to draw on and an image to show the selection window
-    out_img = np.dstack((binary_warped, binary_warped, binary_warped)) * 255
-    window_img = np.zeros_like(out_img)
-    # Color in left and right line pixels
-    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
-
-    # Generate a polygon to illustrate the search window area
-    # And recast the x and y points into usable format for cv2.fillPoly()
-    left_line_window1 = np.array([np.transpose(np.vstack([left_fitx - margin, ploty]))])
-    left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx + margin,
-                                                                    ploty])))])
-    left_line_pts = np.hstack((left_line_window1, left_line_window2))
-    right_line_window1 = np.array([np.transpose(np.vstack([right_fitx - margin, ploty]))])
-    right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx + margin,
-                                                                     ploty])))])
-    right_line_pts = np.hstack((right_line_window1, right_line_window2))
-
-    # Draw the lane onto the warped blank image
-    cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
-    cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
-    result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
-
-    return result, left_fit, right_fit
 
 
 def curvature_calc(lanes_left_fitx, lanes_right_fitx, ploty):
@@ -415,15 +336,16 @@ def curvature_calc(lanes_left_fitx, lanes_right_fitx, ploty):
     :return: values of the left and right lane curvature in meters
     Ref: Course notes
     """
-    # TODO: Update comments
     # Fit a second order polynomial to pixel positions in each fake lane line
     left_fit = np.polyfit(ploty, lanes_left_fitx, 2)
     left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
     right_fit = np.polyfit(ploty, lanes_right_fitx, 2)
     right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
+
     y_eval = np.max(ploty)
     left_curverad = ((1 + (2 * left_fit[0] * y_eval + left_fit[1]) ** 2) ** 1.5) / np.absolute(2 * left_fit[0])
     right_curverad = ((1 + (2 * right_fit[0] * y_eval + right_fit[1]) ** 2) ** 1.5) / np.absolute(2 * right_fit[0])
+
     # Define conversions in x and y from pixels space to meters
     ym_per_pix = 30 / 720  # meters per pixel in y dimension
     xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
@@ -431,12 +353,12 @@ def curvature_calc(lanes_left_fitx, lanes_right_fitx, ploty):
     # Fit new polynomials to x,y in world space
     left_fit_cr = np.polyfit(ploty * ym_per_pix, lanes_left_fitx * xm_per_pix, 2)
     right_fit_cr = np.polyfit(ploty * ym_per_pix, lanes_right_fitx * xm_per_pix, 2)
-    # Calculate the new radii of curvature
+
+    # Calculate the new radius of curvature
     left_curverad = ((1 + (2 * left_fit_cr[0] * y_eval * ym_per_pix + left_fit_cr[1]) ** 2) ** 1.5) / np.absolute(
         2 * left_fit_cr[0])
     right_curverad = ((1 + (2 * right_fit_cr[0] * y_eval * ym_per_pix + right_fit_cr[1]) ** 2) ** 1.5) / np.absolute(
         2 * right_fit_cr[0])
-
     return left_curverad, right_curverad
 
 
@@ -465,10 +387,10 @@ def draw_over(warped, undist, lanes_left_fitx, lanes_right_fitx, ploty, Minv):
     cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
 
     # Warp the blank back to original image space using inverse perspective matrix (Minv)
-    newwarp = cv2.warpPerspective(color_warp, Minv, (1280, 720))
+    new_warp = cv2.warpPerspective(color_warp, Minv, (1280, 720))
 
     # Combine the result with the original image
-    result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
+    result = cv2.addWeighted(undist, 1, new_warp, 0.3, 0)
     return result
 
 
@@ -479,7 +401,6 @@ def find_vehicle_offset(undist, left_fit, right_fit):
     :param left_fit: Left lane boundary
     :param right_fit: Right lane boundary
     :return: value of vehicle offset within the lane in meters
-
     Ref: https://github.com/georgesung/advanced_lane_detection
     """
     # Calculate vehicle center offset in pixels
@@ -491,7 +412,6 @@ def find_vehicle_offset(undist, left_fit, right_fit):
     # Convert pixel offset to meters
     xm_per_pix = 3.7/700  # meters per pixel in x dimension
     vehicle_offset *= xm_per_pix
-
     return vehicle_offset
 
 
@@ -501,16 +421,24 @@ def process_image(image):
     :param image: frame image
     :return: processed image
     """
-    # TODO: This is incomplete. Update this function for correct video processing
     undist_image = cv2.undistort(image, mtx, dist, None, mtx)
     combined_binary = all_combined_threshold(undist_image)
-
-    # Debug
-    #blank_image = np.zeros((720, 1280, 3), np.uint8)
-    #blank_image[:, :, 0] = combined_binary
-    #blank_image[:, :, 1] = combined_binary
-    #blank_image[:, :, 2] = combined_binary
-    return combined_binary
+    warped_image, M, Minv = perspective_warp(combined_binary)
+    lanes_img, lanes_left_fitx, lanes_right_fitx, ploty, left_fit, right_fit = find_lanes(warped_image)
+    left_curve, right_curve = curvature_calc(lanes_left_fitx, lanes_right_fitx, ploty)
+    curve_avg = (left_curve + right_curve) / 2
+    upper_message = "Radius of curvature is " + str(round(curve_avg, 2)) + " meters"
+    img_lanes = draw_over(warped_image, undist_image, lanes_left_fitx, lanes_right_fitx, ploty, Minv)
+    offset = find_vehicle_offset(undist_image, left_fit, right_fit)
+    if offset <= 0:
+        lower_message = "Vehicle is " + str(abs(round(offset, 2))) + " meters left of center"
+    else:
+        lower_message = "Vehicle is " + str(abs(round(offset, 2))) + " meters right of center"
+    final_image = cv2.putText(img_lanes, text=upper_message, org=(20, 70), fontFace=2, fontScale=1,
+                              color=(0, 0, 255), thickness=4)
+    final_image = cv2.putText(img_lanes, text=lower_message, org=(20, 130), fontFace=2, fontScale=1,
+                              color=(0, 0, 255), thickness=4)
+    return final_image
 
 # Define global variables of calibration coefficients
 global mtx, dist
@@ -518,7 +446,7 @@ global mtx, dist
 
 if __name__ == "__main__":
 
-    DEBUG = True  # Save all intermediate images
+    DEBUG = False  # Save all intermediate images
 
     # Calibrate camera
     mtx, dist = calibration()
@@ -531,7 +459,6 @@ if __name__ == "__main__":
         input_image = cv2.imread(f_name)
 
         if DEBUG is True:
-            # Save input file for comparison purposes after
             ax1 = plt.clf()
             ax1 = plt.imshow(input_image)
             ax1 = plt.savefig(f_name[:-4] + '_A_processed.png')
@@ -539,7 +466,6 @@ if __name__ == "__main__":
         undist_image = cv2.undistort(input_image, mtx, dist, None, mtx)
 
         if DEBUG is True:
-            # Tests of undistort function
             ax2 = plt.clf()
             ax2 = plt.imshow(undist_image)
             ax2 = plt.savefig(f_name[:-4] + '_B_undistort.png')
@@ -549,7 +475,6 @@ if __name__ == "__main__":
         grad_binary = absolute_sobel_threshold(undist_image, orient='x', thresh=(50,255))
 
         if DEBUG is True:
-            # Tests of abs_sobel_thresh function
             ax3 = plt.clf()
             ax3 = plt.imshow(grad_binary)
             ax3 = plt.savefig(f_name[:-4] + '_C_abs_sobel_thresh.png')
@@ -558,7 +483,6 @@ if __name__ == "__main__":
         mag_binary = magnitude_threshold(undist_image, sobel_kernel=3, mag_thresh=(50, 255))
 
         if DEBUG is True:
-            # Tests of mag_thresh function
             ax4 = plt.clf()
             ax4 = plt.imshow(mag_binary)
             ax4 = plt.savefig(f_name[:-4] + '_D_mag_thresh.png')
@@ -567,7 +491,6 @@ if __name__ == "__main__":
         dir_binary = direction_threshold(undist_image, sobel_kernel=15, thresh=(0.7, 1.3))
 
         if DEBUG is True:
-            # Tests of dir_threshold function
             ax5 = plt.clf()
             ax5 = plt.imshow(dir_binary)
             ax5 = plt.savefig(f_name[:-4] + '_E_dir_binary.png')
@@ -576,7 +499,6 @@ if __name__ == "__main__":
         hls_binary = hlscolor_threshold(undist_image, thresh=(170, 255))
 
         if DEBUG is True:
-            # Tests of hls_select function
             ax6 = plt.clf()
             ax6 = plt.imshow(hls_binary)
             ax6 = plt.savefig(f_name[:-4] + '_F_hls_select.png')
@@ -585,7 +507,6 @@ if __name__ == "__main__":
         combined_binary = all_combined_threshold(undist_image)
 
         if DEBUG is True:
-            # Tests of hls_select function
             ax7 = plt.clf()
             ax7 = plt.imshow(combined_binary)
             ax7 = plt.savefig(f_name[:-4] + '_G_combined_thresh.png')
@@ -594,7 +515,6 @@ if __name__ == "__main__":
         warped_image, M, Minv = perspective_warp(combined_binary)
 
         if DEBUG is True:
-            # Tests of hls_select function
             ax8 = plt.clf()
             ax8 = plt.imshow(warped_image)
             ax8 = plt.savefig(f_name[:-4] + '_H_perspective.png')
@@ -603,7 +523,6 @@ if __name__ == "__main__":
         lanes_img, lanes_left_fitx, lanes_right_fitx, ploty, left_fit, right_fit = find_lanes(warped_image)
 
         if DEBUG is True:
-            # Tests of hls_select function
             ax9 = plt.clf()
             ax9 = plt.imshow(lanes_img)
             ax9 = plt.plot(lanes_left_fitx, ploty, color='yellow')
@@ -616,12 +535,12 @@ if __name__ == "__main__":
         left_curve, right_curve = curvature_calc(lanes_left_fitx, lanes_right_fitx, ploty)
         curve_avg = (left_curve + right_curve) / 2
         print("Filename: ", f_name, " Left:", left_curve, " Right:", right_curve, " Average:", curve_avg)
+        upper_message = "Radius of curvature is " + str(round(curve_avg,2)) + " meters"
 
         # Draw lanes over undistorted image
         img_lanes = draw_over(warped_image, undist_image, lanes_left_fitx, lanes_right_fitx, ploty, Minv)
 
         if DEBUG is True:
-            # Tests of hls_select function
             ax10 = plt.clf()
             ax10 = plt.imshow(img_lanes)
             ax10 = plt.savefig(f_name[:-4] + '_J_withLanes.png')
@@ -631,29 +550,27 @@ if __name__ == "__main__":
         # Vehicle offset
         offset = find_vehicle_offset(undist_image, left_fit, right_fit)
         print("Filename: ", f_name, " Vehicle offset: ", offset)
+        if offset <= 0:
+            lower_message = "Vehicle is " + str(abs(round(offset, 2))) + " meters left of center"
+        else:
+            lower_message = "Vehicle is " + str(abs(round(offset, 2))) + " meters right of center"
 
-        #    if DEBUG is True:
-        #        # Tests of hls_select function
-        #        # ploty = np.linspace(0, warped_image.shape[0] - 1, warped_image.shape[0])
-        #        ax10 = plt.clf()
-        #        plt.imshow(result)
-        #        plt.plot(left_fitx, ploty, color='yellow')
-        #        plt.plot(right_fitx, ploty, color='yellow')
-        #        plt.xlim(0, 1280)
-        #        plt.ylim(720, 0)
-        #        ax10 = plt.savefig(f_name[:-4] + '_I_lanes.png')
+        # Overlay parameters
+        final_image = cv2.putText(img_lanes, text=upper_message, org=(20, 70), fontFace=2, fontScale=1,
+                                   color=(0, 0, 255), thickness=4)
 
+        final_image = cv2.putText(img_lanes, text=lower_message, org=(20, 130), fontFace=2, fontScale=1,
+                                  color=(0, 0, 255), thickness=4)
 
+        # Save result
+        ax11 = plt.clf()
+        ax11 = plt.imshow(final_image)
+        ax11 = plt.savefig(f_name[:-4] + '_K_final.png')
     # End of the FOR loop of a sequence of test images
 
-
-
-
-
-
     # Process video
-    #video_input = VideoFileClip("videos/project_video.mp4").subclip(0, 5)
-    #video_output = 'videos/OUTPUT_VIDEO.mp4'#
+    video_input = VideoFileClip("videos/project_video.mp4")#.subclip(0, 5)
+    video_output = 'videos/OUTPUT_VIDEO.mp4'
 
-    #output_clip = video_input.fl_image(process_image)
-    #output_clip.write_videofile(video_output, audio=False)
+    output_clip = video_input.fl_image(process_image)
+    output_clip.write_videofile(video_output, audio=False)
