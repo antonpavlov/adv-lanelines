@@ -31,21 +31,36 @@ The following approach was suggested during the course:
 
 ### Example of processing ###
 Camera calibration - Original image
-![Original](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/calibration1_processed.png =250x)
+![Original](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/calibration1_processed.png)
 
 
 Camera calibration - Undistorted image
 ![Undistorted](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/calibration1_undistorted.png)
 
+<br />
+
 Let's build the following pipeline:
+
 1. Open an image
+
 ![Processed](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_A_processed.png)
 
+<br />
+
+
 2. Apply image correction
+
 ![Undistort](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_B_undistort.png)
 
+<br />
+
+
 3. Application of Sobel operator on undistorted image 
+
 ![Gradient](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_C_abs_sobel_thresh.png)
+
+<br />
+
 
 4. Filter an image by gradient magnitude in both (x and y) directions 
 ![Magnitude](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_D_mag_thresh.png)
