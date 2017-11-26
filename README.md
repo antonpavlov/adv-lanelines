@@ -31,7 +31,8 @@ The following approach was suggested during the course:
 
 ### Example of processing ###
 Camera calibration - Original image
-![Original](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/calibration1_processed.png)
+![Original](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/calibration1_processed.png =250x)
+
 
 Camera calibration - Undistorted image
 ![Undistorted](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/calibration1_undistorted.png)
