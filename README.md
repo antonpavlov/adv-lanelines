@@ -63,25 +63,53 @@ Let's build the following pipeline:
 
 
 4. Filter an image by gradient magnitude in both (x and y) directions 
+
 ![Magnitude](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_D_mag_thresh.png)
 
+<br />
+
+
 5. Filter an image considering gradient orientation 
+
 ![Orientation](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_E_dir_binary.png)
 
+<br />
+
+
 6. HLS color space threshold 
+
 ![HLS](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_F_hls_select.png)
 
+<br />
+
+
 7. All thresholds applied together to undistorted image
+
 ![All_together](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_G_combined_thresh.png)
 
+<br />
+
+
 8. Perspective transform; warp-in image
+
 ![Perspective](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_H_perspective.png)
 
+<br />
+
+
 9. Find lanes in a binary warped image
+
 ![Lanes](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_I_lanes.png)
 
+<br />
+
+
 10. Make curvature calculations; vehicle position and draw results over an original image
+
 ![Lanes](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_K_final.png)
+
+<br />
+
 
 ### License ###
 
