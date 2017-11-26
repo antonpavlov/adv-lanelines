@@ -4,7 +4,14 @@ Advanced Lane Finding - Udacity Self-Driving Car Engineer Nanodegree.
 The goal of this project is to build an *advanced* software pipeline for an automatic recognition of road surface markings. A *simpler* version of this project can be found here: [https://github.com/antonpavlov/lanelines](https://github.com/antonpavlov/lanelines)
 
 ### Contents of the repo ###
-<placeholder>
+`<camera_cal>` - A folder with calibration images <br />
+`<support_files>` - A folder with images used in README <br />
+`<test_images>` - A folder with test images; Results of processing will be saved there. <br /> 
+`<videos>` - A folder with the test video; Result will be saved there. <br />
+`.gitignore` - .gitignore for Python. <br />
+`LICENSE` - MIT license. <br />
+`README.md` - this file. <br />
+`lane-finder.py` - The script for lane finding.
 
 ### Environment set-up ###
 
@@ -29,7 +36,7 @@ The following approach was suggested during the course:
 - Calibration coefficients are related to a specific camera used to record images. 
 - Script in this repo works only with 1280 X 720 images.
 
-### Example of processing ###
+### Examples of processing ###
 Camera calibration - Original image
 ![Original](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/calibration1_processed.png)
 
