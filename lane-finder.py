@@ -85,6 +85,34 @@ def calibration():
     return cal_mtx, cal_dist
 
 
+def select_yellow(image):
+    """
+    Threshold to select a yellow color marks
+    :param image: Undistorted image
+    :return: Thresholded image
+    Ref: Udacity review
+    """
+    hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    lower = np.array([20, 60, 60])
+    upper = np.array([38, 174, 250])
+    mask = cv2.inRange(hsv, lower, upper)
+    return mask
+
+
+def select_white(image):
+    """
+    Threshold to select a white color marks
+    :param image: Undistorted image
+    :return: Thresholded image
+    Ref: Udacity review
+    """
+    #lower = np.array([202, 202, 202])
+    lower = np.array([190, 190, 190])
+    upper = np.array([255, 255, 255])
+    mask = cv2.inRange(image, lower, upper)
+    return mask
+
+
 def absolute_sobel_threshold(img, orient='x', thresh=(0, 255)):
     """
     Application of Sobel operator on undistorted image
@@ -180,8 +208,19 @@ def hlscolor_threshold(img, thresh=(0, 255)):
     """
     hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
     s_channel = hls[:, :, 2]
-    result = np.zeros_like(s_channel)
-    result[(s_channel > thresh[0]) & (s_channel <= thresh[1])] = 1
+    #result = np.zeros_like(s_channel)
+    #result[(s_channel > thresh[0]) & (s_channel <= thresh[1])] = 1
+
+    yellow = select_yellow(img)
+    white = select_white(img)
+
+    result = np.zeros_like(yellow)
+    result[(yellow >= 1) | (white >= 1)] = 1
+
+    result[((s_channel > thresh[0]) | ((s_channel <= thresh[1])
+                                                & (yellow == 1))) | white == 1] = 1
+
+
     return result
 
 
@@ -200,9 +239,17 @@ def all_combined_threshold(input_image):
     magnitude_binary = magnitude_threshold(input_image, sobel_kernel=ksize, mag_thresh=(50, 255))
     direction_binary = direction_threshold(input_image, sobel_kernel=ksize, thresh=(0.7, 1.3))
     hlscolor_binary = hlscolor_threshold(input_image, thresh=(170, 255))
+    yellow = select_yellow(input_image)
+    white = select_white(input_image)
 
     # Combine threshold results in one binary image
     combine_all_binary = np.zeros_like(dir_binary)
+
+    # Reviewer suggestion to consider colors
+    #combine_all_binary[(absolute_binary == 1 | ((magnitude_binary == 1)
+    #                 & (direction_binary == 1 | ((hlscolor_binary == 1)
+    #                 & (yellow == 1))))) | white == 1] = 1
+
     combine_all_binary[(absolute_binary == 1 | ((magnitude_binary == 1)
                                                 & (direction_binary == 1))) | hlscolor_binary == 1] = 1
 
@@ -325,6 +372,60 @@ def find_lanes(binary_warped):
 
     ploty = np.linspace(0, warped_image.shape[0] - 1, warped_image.shape[0])
     return out_img, left_fitx, right_fitx, ploty, left_fit, right_fit
+
+
+def find_lanes_secondary(binary_warped, left_fit, right_fit):
+    # Assume you now have a new warped binary image
+    # from the next frame of video (also called "binary_warped")
+    # It's now much easier to find line pixels!
+    nonzero = binary_warped.nonzero()
+    nonzeroy = np.array(nonzero[0])
+    nonzerox = np.array(nonzero[1])
+    margin = 100
+    left_lane_inds = ((nonzerox > (left_fit[0] * (nonzeroy ** 2) + left_fit[1] * nonzeroy +
+                                   left_fit[2] - margin)) & (nonzerox < (left_fit[0] * (nonzeroy ** 2) +
+                                                                         left_fit[1] * nonzeroy + left_fit[
+                                                                             2] + margin)))
+
+    right_lane_inds = ((nonzerox > (right_fit[0] * (nonzeroy ** 2) + right_fit[1] * nonzeroy +
+                                    right_fit[2] - margin)) & (nonzerox < (right_fit[0] * (nonzeroy ** 2) +
+                                                                           right_fit[1] * nonzeroy + right_fit[
+                                                                               2] + margin)))
+
+    # Again, extract left and right line pixel positions
+    leftx = nonzerox[left_lane_inds]
+    lefty = nonzeroy[left_lane_inds]
+    rightx = nonzerox[right_lane_inds]
+    righty = nonzeroy[right_lane_inds]
+    # Fit a second order polynomial to each
+    left_fit = np.polyfit(lefty, leftx, 2)
+    right_fit = np.polyfit(righty, rightx, 2)
+    # Generate x and y values for plotting
+    ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
+    left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
+    right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
+
+    # Create an image to draw on and an image to show the selection window
+    out_img = np.dstack((binary_warped, binary_warped, binary_warped)) * 255
+    window_img = np.zeros_like(out_img)
+    # Color in left and right line pixels
+    out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+    out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+
+    ## Generate a polygon to illustrate the search window area
+    # And recast the x and y points into usable format for cv2.fillPoly()
+    #left_line_window1 = np.array([np.transpose(np.vstack([left_fitx - margin, ploty]))])
+    #left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx + margin, ploty])))])
+    #left_line_pts = np.hstack((left_line_window1, left_line_window2))
+    #right_line_window1 = np.array([np.transpose(np.vstack([right_fitx - margin, ploty]))])
+    #right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx + margin, ploty])))])
+    #right_line_pts = np.hstack((right_line_window1, right_line_window2))
+
+    # Draw the lane onto the warped blank image
+    #cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
+    #cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
+    result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
+    return out_img
 
 
 def curvature_calc(lanes_left_fitx, lanes_right_fitx, ploty):
@@ -545,8 +646,6 @@ if __name__ == "__main__":
             ax10 = plt.imshow(img_lanes)
             ax10 = plt.savefig(f_name[:-4] + '_J_withLanes.png')
 
-        # Find lanes - secondary function
-
         # Vehicle offset
         offset = find_vehicle_offset(undist_image, left_fit, right_fit)
         print("Filename: ", f_name, " Vehicle offset: ", offset)
@@ -569,7 +668,7 @@ if __name__ == "__main__":
     # End of the FOR loop of a sequence of test images
 
     # Process video
-    video_input = VideoFileClip("videos/project_video.mp4")#.subclip(0, 5)
+    video_input = VideoFileClip("videos/project_video.mp4").subclip(35, 45)
     video_output = 'videos/OUTPUT_VIDEO.mp4'
 
     output_clip = video_input.fl_image(process_image)

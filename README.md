@@ -1,7 +1,7 @@
 # adv-lanelines
 Advanced Lane Finding - Udacity Self-Driving Car Engineer Nanodegree. 
 
-The goal of this project is to build an *advanced* software pipeline for an automatic recognition of road surface markings. A *simpler* version of this project can be found here: [https://github.com/antonpavlov/lanelines](https://github.com/antonpavlov/lanelines)
+The goal of this project is to build an *advanced* software pipeline for an automatic recognition of a road surface markings. A *simpler* version of this project can be found here: [https://github.com/antonpavlov/lanelines](https://github.com/antonpavlov/lanelines). This repository strongly relies and contains references to Udacity's self-driving car nanodegree program.
 
 ### Contents of the repo ###
 `<camera_cal>` - A folder with calibration images <br />
@@ -9,17 +9,17 @@ The goal of this project is to build an *advanced* software pipeline for an auto
 `<test_images>` - A folder with test images; Results of processing will be saved there. <br /> 
 `<videos>` - A folder with the test video; Result will be saved there. <br />
 `.gitignore` - .gitignore for Python. <br />
-`LICENSE` - MIT license. <br />
+`LICENSE` - The MIT license text. <br />
 `README.md` - this file. <br />
 `lane-finder.py` - The script for lane finding.
 
 ### Environment set-up ###
 
-Before run a script this repo, please install an environment with all required dependencies: [https://github.com/udacity/CarND-Term1-Starter-Kit](https://github.com/udacity/CarND-Term1-Starter-Kit)
+Before run a script from this repo, please setup an environment with all required dependencies: [https://github.com/udacity/CarND-Term1-Starter-Kit](https://github.com/udacity/CarND-Term1-Starter-Kit)
     
 Download also an input data from Udacity's project repository: [https://github.com/udacity/CarND-Advanced-Lane-Lines](https://github.com/udacity/CarND-Advanced-Lane-Lines)
 
-Clone this repository somewhere and copy from there the `lane-finder.py` script into the **CarND-Advanced-Lane-Lines** folder.
+Clone this repository somewhere and copy from there the `lane-finder.py` script only into the **CarND-Advanced-Lane-Lines** folder. I suggest to use [Anaconda](https://www.anaconda.com/download/).
 
 ### Reflection ###
 The following approach was suggested during the course:
@@ -32,9 +32,14 @@ The following approach was suggested during the course:
 7. Warp the detected lane boundaries back onto the original image.
 8. Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
-### Technical restrictions ###
+### Technical restrictions and weaknesses ###
 - Calibration coefficients are related to a specific camera used to record images. 
 - Script in this repo works only with 1280 X 720 images.
+- The proposed pipeline has several weaknesses related to lane marks recognition. Some of them are related to lightning conditions, time of the day, and weather (rain and snow); some of them are related to road surface quality.
+- The pipeline is not able to do any inference regarding lane marks and vehicle position when part of the lane ahead is obstructed by another car.
+- The pipeline relies on existence of the road marking on that particular road under evaluation. 
+- Unfortunately, most of coefficients of a transforms and a thresholds are specified on empirical basis considering only images, proposed by Udacity. 
+
 
 ### Examples of processing ###
 Camera calibration - Original image
@@ -116,6 +121,10 @@ Let's build the following pipeline:
 ![Lanes](https://github.com/antonpavlov/adv-lanelines/blob/master/support_files/test3_K_final.png)
 
 <br />
+
+
+### Future work ###
+As a future work, it might be the case for an application of a newly proposed Hinton’s Capsule Networks. These networks may be trained to make an inference over lane existence and its bounds taking into account important spatial hierarchies of lane markings, other vehicles and road equipment. 
 
 
 ### License ###
