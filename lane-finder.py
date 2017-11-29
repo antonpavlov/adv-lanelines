@@ -51,13 +51,10 @@ def calibration():
 
         # Skip following files; nx and ny should be 9 and 6 only
         if fname == './camera_cal/calibration1.jpg':
-            #print("Break!")  # Debug
             pass
         elif fname == './camera_cal/calibration4.jpg':
-            #print("Break!")  # Debug
             pass
         elif fname == './camera_cal/calibration5.jpg':
-            #print("Break!")  # Debug
             pass
         else:
             # Open an input image
@@ -87,7 +84,7 @@ def calibration():
 
 def select_yellow(image):
     """
-    Threshold to select a yellow color marks
+    Threshold to select a yellow color objects
     :param image: Undistorted image
     :return: Thresholded image
     Ref: Udacity review
@@ -101,7 +98,7 @@ def select_yellow(image):
 
 def select_white(image):
     """
-    Threshold to select a white color marks
+    Threshold to select a white color objects
     :param image: Undistorted image
     :return: Thresholded image
     Ref: Udacity review
@@ -208,8 +205,6 @@ def hlscolor_threshold(img, thresh=(0, 255)):
     """
     hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
     s_channel = hls[:, :, 2]
-    #result = np.zeros_like(s_channel)
-    #result[(s_channel > thresh[0]) & (s_channel <= thresh[1])] = 1
 
     yellow = select_yellow(img)
     white = select_white(img)
@@ -232,24 +227,16 @@ def all_combined_threshold(input_image):
     Ref: Course notes
     """
     # Sobel kernel size
-    ksize = 3  # Should be an odd number to smooth a gradient
+    ksize = 5  # Should be an odd number to smooth a gradient
 
     # Apply threshold functions
-    absolute_binary = absolute_sobel_threshold(input_image, orient='x', thresh=(50, 255))
-    magnitude_binary = magnitude_threshold(input_image, sobel_kernel=ksize, mag_thresh=(50, 255))
+    absolute_binary = absolute_sobel_threshold(input_image, orient='x', thresh=(30, 255))
+    magnitude_binary = magnitude_threshold(input_image, sobel_kernel=ksize, mag_thresh=(60, 255))
     direction_binary = direction_threshold(input_image, sobel_kernel=ksize, thresh=(0.7, 1.3))
     hlscolor_binary = hlscolor_threshold(input_image, thresh=(170, 255))
-    yellow = select_yellow(input_image)
-    white = select_white(input_image)
 
     # Combine threshold results in one binary image
     combine_all_binary = np.zeros_like(dir_binary)
-
-    # Reviewer suggestion to consider colors
-    #combine_all_binary[(absolute_binary == 1 | ((magnitude_binary == 1)
-    #                 & (direction_binary == 1 | ((hlscolor_binary == 1)
-    #                 & (yellow == 1))))) | white == 1] = 1
-
     combine_all_binary[(absolute_binary == 1 | ((magnitude_binary == 1)
                                                 & (direction_binary == 1))) | hlscolor_binary == 1] = 1
 
@@ -264,24 +251,11 @@ def perspective_warp(img):
     Ref: https://github.com/georgesung/advanced_lane_detection
     """
     img_size = (img.shape[1], img.shape[0])
-
-    src = np.float32(
-         [[200, 720],
-         [1100, 720],
-         [595, 450],
-         [685, 450]])
-
-    dst = np.float32(
-         [[300, 720],
-         [980, 720],
-         [300, 0],
-         [980, 0]])
-
+    src = np.float32([[200, 720], [1100, 720], [595, 450], [685, 450]])
+    dst = np.float32([[300, 720], [980, 720], [300, 0], [980, 0]])
     m = cv2.getPerspectiveTransform(src, dst)
     m_inv = cv2.getPerspectiveTransform(dst, src)
-
     warped = cv2.warpPerspective(img, m, img_size, flags=cv2.INTER_LINEAR)
-
     return warped, m, m_inv
 
 
@@ -371,6 +345,7 @@ def find_lanes(binary_warped):
     out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
 
     ploty = np.linspace(0, warped_image.shape[0] - 1, warped_image.shape[0])
+    videoFlag = True
     return out_img, left_fitx, right_fitx, ploty, left_fit, right_fit
 
 
@@ -407,7 +382,7 @@ def find_lanes_secondary(binary_warped, left_fit, right_fit):
 
     # Create an image to draw on and an image to show the selection window
     out_img = np.dstack((binary_warped, binary_warped, binary_warped)) * 255
-    window_img = np.zeros_like(out_img)
+    #window_img = np.zeros_like(out_img)
     # Color in left and right line pixels
     out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
     out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
@@ -424,8 +399,8 @@ def find_lanes_secondary(binary_warped, left_fit, right_fit):
     # Draw the lane onto the warped blank image
     #cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
     #cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
-    result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
-    return out_img
+    #result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
+    return out_img, left_fitx, right_fitx, ploty, left_fit, right_fit
 
 
 def curvature_calc(lanes_left_fitx, lanes_right_fitx, ploty):
@@ -522,10 +497,18 @@ def process_image(image):
     :param image: frame image
     :return: processed image
     """
+    global videoFlag
     undist_image = cv2.undistort(image, mtx, dist, None, mtx)
     combined_binary = all_combined_threshold(undist_image)
     warped_image, M, Minv = perspective_warp(combined_binary)
+
+    #if videoFlag is False:
     lanes_img, lanes_left_fitx, lanes_right_fitx, ploty, left_fit, right_fit = find_lanes(warped_image)
+    if videoFlag is True:
+        lanes_img, lanes_left_fitx, lanes_right_fitx, ploty, left_fit, right_fit = find_lanes_secondary(warped_image,
+                                                                                                        left_fit,
+                                                                                                        right_fit)
+
     left_curve, right_curve = curvature_calc(lanes_left_fitx, lanes_right_fitx, ploty)
     curve_avg = (left_curve + right_curve) / 2
     upper_message = "Radius of curvature is " + str(round(curve_avg, 2)) + " meters"
@@ -539,15 +522,17 @@ def process_image(image):
                               color=(0, 0, 255), thickness=4)
     final_image = cv2.putText(img_lanes, text=lower_message, org=(20, 130), fontFace=2, fontScale=1,
                               color=(0, 0, 255), thickness=4)
+    videoFlag = True
     return final_image
 
 # Define global variables of calibration coefficients
-global mtx, dist
+global mtx, dist, videoFlag
 
 
 if __name__ == "__main__":
 
     DEBUG = False  # Save all intermediate images
+    videoFlag = False
 
     # Calibrate camera
     mtx, dist = calibration()
