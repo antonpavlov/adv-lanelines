@@ -91,7 +91,8 @@ def select_yellow(image):
     """
     hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
     lower = np.array([20, 60, 60])
-    upper = np.array([38, 174, 250])
+    #upper = np.array([38, 174, 250])
+    upper = np.array([110, 174, 250])
     mask = cv2.inRange(hsv, lower, upper)
     return mask
 
@@ -103,8 +104,8 @@ def select_white(image):
     :return: Thresholded image
     Ref: Udacity review
     """
-    #lower = np.array([202, 202, 202])
-    lower = np.array([190, 190, 190])
+    lower = np.array([202, 202, 202])
+    #lower = np.array([190, 190, 190])
     upper = np.array([255, 255, 255])
     mask = cv2.inRange(image, lower, upper)
     return mask
@@ -205,18 +206,24 @@ def hlscolor_threshold(img, thresh=(0, 255)):
     """
     hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
     s_channel = hls[:, :, 2]
+    binary_output = np.zeros_like(s_channel)
+    binary_output[(s_channel > thresh[0]) & (s_channel <= thresh[1])] = 1
+    return binary_output
 
+
+def color_threshold(img):
+    """
+    RGB color space threshold
+    :param img: Undistorted image
+    :return: Thresholded binary image
+    Ref: Course notes
+    """
     yellow = select_yellow(img)
     white = select_white(img)
 
-    result = np.zeros_like(yellow)
-    result[(yellow >= 1) | (white >= 1)] = 1
-
-    result[((s_channel > thresh[0]) | ((s_channel <= thresh[1])
-                                                & (yellow == 1))) | white == 1] = 1
-
-
-    return result
+    combined_binary = np.zeros_like(yellow)
+    combined_binary[(yellow >= 1) | (white >= 1)] = 1
+    return combined_binary
 
 
 def all_combined_threshold(input_image):
@@ -230,17 +237,62 @@ def all_combined_threshold(input_image):
     ksize = 5  # Should be an odd number to smooth a gradient
 
     # Apply threshold functions
-    absolute_binary = absolute_sobel_threshold(input_image, orient='x', thresh=(30, 255))
+    absolute_binaryX = absolute_sobel_threshold(input_image, orient='x', thresh=(30, 255))
+    absolute_binaryY = absolute_sobel_threshold(input_image, orient='y', thresh=(30, 255))
     magnitude_binary = magnitude_threshold(input_image, sobel_kernel=ksize, mag_thresh=(60, 255))
     direction_binary = direction_threshold(input_image, sobel_kernel=ksize, thresh=(0.7, 1.3))
-    hlscolor_binary = hlscolor_threshold(input_image, thresh=(170, 255))
+    #hlscolor_binary = hlscolor_threshold(input_image, thresh=(170, 255))
 
     # Combine threshold results in one binary image
-    combine_all_binary = np.zeros_like(dir_binary)
-    combine_all_binary[(absolute_binary == 1 | ((magnitude_binary == 1)
-                                                & (direction_binary == 1))) | hlscolor_binary == 1] = 1
+    #combine_all_binary = np.zeros_like(dir_binary)
+    #combine_all_binary[(absolute_binary == 1 | ((magnitude_binary == 1)
+    #                                            & (direction_binary == 1))) | hlscolor_binary == 1] = 1
+
+    # Gaussian Blur
+    #kernel_size = 5
+    #img = cv2.GaussianBlur(input_image, (kernel_size, kernel_size), 0)
+    # Sobel kernel size (choose a larger odd number to smooth gradient measurements)
+    #ksize = 5
+    # Apply Sobel on x-axis
+    #grad_x_binary = absolute_sobel_threshold(img, orient='x', thresh=(10, 255))
+    # Apply Sobel on y-axis
+    #grad_y_binary = absolute_sobel_threshold(img, orient='y', thresh=(60, 255))
+    # Apply Sobel x and y, compute the magnitude of the gradient and apply a threshold
+    #mag_binary = magnitude_threshold(img, sobel_kernel=ksize, mag_thresh=(40, 255))
+    # Apply Sobel x and y, computes the direction of the gradient and apply a threshold
+    #dir_binary = direction_threshold(img, sobel_kernel=ksize, thresh=(0.65, 1.05))
+
+    # Combine the thresholds
+    combine_all_binary = np.zeros_like(direction_binary)
+    #combine_all_binary[((grad_x_binary == 1) & (grad_y_binary == 1)) | ((mag_binary == 1) & (dir_binary == 1))]
+    combine_all_binary[((absolute_binaryX == 1) | (absolute_binaryY == 1)) & ((magnitude_binary == 1) | (direction_binary == 1))]
 
     return combine_all_binary
+
+
+def combined_color(input_image):
+    """
+    Apply all color thresholds to undistorted image
+    :param input_image: Undistorted image
+    :return: Combined binary image
+    Ref: Course notes
+    """
+    hls_binary = hlscolor_threshold(input_image, thresh=(160, 255))
+    color_binary = color_threshold(input_image)
+
+    # Combine the thresholds
+    combine_all_binary = np.zeros_like(color_binary)
+    combine_all_binary[(hls_binary == 1) & (color_binary == 1)] = 1
+
+    return combine_all_binary
+
+
+def mega_thresh(input_image):
+    all_sobel = all_combined_threshold(input_image)
+    all_color = combined_color(input_image)
+    combined_binary = np.zeros_like(all_color)
+    combined_binary[(all_sobel == 1) | (all_color == 1)] = 1
+    return combined_binary
 
 
 def perspective_warp(img):
@@ -499,7 +551,8 @@ def process_image(image):
     """
     global videoFlag
     undist_image = cv2.undistort(image, mtx, dist, None, mtx)
-    combined_binary = all_combined_threshold(undist_image)
+    #combined_binary = all_combined_threshold(undist_image)
+    combined_binary = mega_thresh(undist_image)
     warped_image, M, Minv = perspective_warp(combined_binary)
 
     #if videoFlag is False:
@@ -525,13 +578,14 @@ def process_image(image):
     videoFlag = True
     return final_image
 
+
 # Define global variables of calibration coefficients
 global mtx, dist, videoFlag
 
 
 if __name__ == "__main__":
 
-    DEBUG = False  # Save all intermediate images
+    DEBUG = True  # Save all intermediate images
     videoFlag = False
 
     # Calibrate camera
@@ -555,6 +609,73 @@ if __name__ == "__main__":
             ax2 = plt.clf()
             ax2 = plt.imshow(undist_image)
             ax2 = plt.savefig(f_name[:-4] + '_B_undistort.png')
+
+        test1 = select_yellow(undist_image)
+        if DEBUG is True:
+            ax2a = plt.clf()
+            ax2a = plt.imshow(test1)
+            ax2a = plt.savefig(f_name[:-4] + '_B1_yellow.png')
+
+        test2 = select_white(undist_image)
+        if DEBUG is True:
+            ax2b = plt.clf()
+            ax2b = plt.imshow(test2)
+            ax2b = plt.savefig(f_name[:-4] + '_B2_white.png')
+
+        test3 = absolute_sobel_threshold(undist_image, orient='x', thresh=(10, 255))
+        if DEBUG is True:
+            ax2c = plt.clf()
+            ax2c = plt.imshow(test3)
+            ax2c = plt.savefig(f_name[:-4] + '_B3_sobelX.png')
+
+        test3a = absolute_sobel_threshold(undist_image, orient='y', thresh=(60, 255))
+        if DEBUG is True:
+            ax2d = plt.clf()
+            ax2d = plt.imshow(test3a)
+            ax2d = plt.savefig(f_name[:-4] + '_B3_sobelY.png')
+
+        test4 = magnitude_threshold(undist_image, sobel_kernel=3, mag_thresh=(40, 255))
+        if DEBUG is True:
+            ax2e = plt.clf()
+            ax2e = plt.imshow(test4)
+            ax2e = plt.savefig(f_name[:-4] + '_B4_magnitude.png')
+
+        test5 = direction_threshold(undist_image, sobel_kernel=3, thresh=(0.65, 1.05))
+        if DEBUG is True:
+            ax2f = plt.clf()
+            ax2f = plt.imshow(test5)
+            ax2f = plt.savefig(f_name[:-4] + '_B5_direction.png')
+
+        test6 = hlscolor_threshold(undist_image, thresh=(0, 255))
+        if DEBUG is True:
+            ax2g = plt.clf()
+            ax2g = plt.imshow(test6)
+            ax2g = plt.savefig(f_name[:-4] + '_B6_hls.png')
+
+        test7 = color_threshold(undist_image)
+        if DEBUG is True:
+            ax2h = plt.clf()
+            ax2h = plt.imshow(test7)
+            ax2h = plt.savefig(f_name[:-4] + '_B7_color.png')
+
+        test8 = all_combined_threshold(undist_image)
+        if DEBUG is True:
+            ax2i = plt.clf()
+            ax2i = plt.imshow(test8)
+            ax2i = plt.savefig(f_name[:-4] + '_B8_Sobel_combined.png')
+
+        test9 = combined_color(undist_image)
+        if DEBUG is True:
+            ax2j = plt.clf()
+            ax2j = plt.imshow(undist_image)
+            ax2j = plt.savefig(f_name[:-4] + '_B9_color_comb.png')
+
+        test10 = mega_thresh(undist_image)
+        if DEBUG is True:
+            ax2k = plt.clf()
+            ax2k = plt.imshow(test10)
+            ax2k = plt.savefig(f_name[:-4] + '_B10_mega.png')
+
 
         # Use color transforms, gradients, etc., to create a thresholded binary image.
         # Absolute horizontal Sobel operator on the image
@@ -590,7 +711,8 @@ if __name__ == "__main__":
             ax6 = plt.savefig(f_name[:-4] + '_F_hls_select.png')
 
         # Combine the above binary images to create the final binary image
-        combined_binary = all_combined_threshold(undist_image)
+        #combined_binary = all_combined_threshold(undist_image)
+        combined_binary = mega_thresh(undist_image)
 
         if DEBUG is True:
             ax7 = plt.clf()
