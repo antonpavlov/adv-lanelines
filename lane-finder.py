@@ -90,9 +90,13 @@ def select_yellow(image):
     Ref: Udacity review
     """
     hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-    lower = np.array([20, 60, 60])
+    #lower = np.array([20, 60, 60])
+    lower = np.array([20, 100, 100]) # better
+    #lower = np.array([23, 60, 60])
     #upper = np.array([38, 174, 250])
-    upper = np.array([110, 174, 250])
+    #upper = np.array([110, 174, 250])
+    upper = np.array([50, 255, 255]) # better
+    #upper = np.array([40, 150, 255])
     mask = cv2.inRange(hsv, lower, upper)
     return mask
 
@@ -220,7 +224,6 @@ def color_threshold(img):
     """
     yellow = select_yellow(img)
     white = select_white(img)
-
     combined_binary = np.zeros_like(yellow)
     combined_binary[(yellow >= 1) | (white >= 1)] = 1
     return combined_binary
@@ -233,14 +236,17 @@ def all_combined_threshold(input_image):
     :return: Combined binary image
     Ref: Course notes
     """
+    kernel_size = 7
+    input_image = cv2.GaussianBlur(input_image, (kernel_size, kernel_size), 0)
     # Sobel kernel size
     ksize = 5  # Should be an odd number to smooth a gradient
 
     # Apply threshold functions
-    absolute_binaryX = absolute_sobel_threshold(input_image, orient='x', thresh=(30, 255))
-    absolute_binaryY = absolute_sobel_threshold(input_image, orient='y', thresh=(30, 255))
-    magnitude_binary = magnitude_threshold(input_image, sobel_kernel=ksize, mag_thresh=(60, 255))
+    absolute_binaryX = absolute_sobel_threshold(input_image, orient='x', thresh=(20, 255)) # thresh=(30, 255)
+    absolute_binaryY = absolute_sobel_threshold(input_image, orient='y', thresh=(20, 255)) # thresh=(30, 255)
+    magnitude_binary = magnitude_threshold(input_image, sobel_kernel=ksize, mag_thresh=(30, 200)) # mag_thresh=(60, 255)
     direction_binary = direction_threshold(input_image, sobel_kernel=ksize, thresh=(0.7, 1.3))
+
     #hlscolor_binary = hlscolor_threshold(input_image, thresh=(170, 255))
 
     # Combine threshold results in one binary image
@@ -265,8 +271,10 @@ def all_combined_threshold(input_image):
     # Combine the thresholds
     combine_all_binary = np.zeros_like(direction_binary)
     #combine_all_binary[((grad_x_binary == 1) & (grad_y_binary == 1)) | ((mag_binary == 1) & (dir_binary == 1))]
-    combine_all_binary[((absolute_binaryX == 1) | (absolute_binaryY == 1)) & ((magnitude_binary == 1) | (direction_binary == 1))]
+    #combine_all_binary[((absolute_binaryX == 1) | (absolute_binaryY == 1)) & ((magnitude_binary == 1) | (direction_binary == 1))]
 
+    combine_all_binary[(absolute_binaryX == 1 | ((absolute_binaryY == 1)
+                                                & (direction_binary == 1))) | magnitude_binary == 1] = 1
     return combine_all_binary
 
 
@@ -282,7 +290,7 @@ def combined_color(input_image):
 
     # Combine the thresholds
     combine_all_binary = np.zeros_like(color_binary)
-    combine_all_binary[(hls_binary == 1) & (color_binary == 1)] = 1
+    combine_all_binary[(hls_binary == 1) | (color_binary == 1)] = 1
 
     return combine_all_binary
 
@@ -303,8 +311,10 @@ def perspective_warp(img):
     Ref: https://github.com/georgesung/advanced_lane_detection
     """
     img_size = (img.shape[1], img.shape[0])
-    src = np.float32([[200, 720], [1100, 720], [595, 450], [685, 450]])
-    dst = np.float32([[300, 720], [980, 720], [300, 0], [980, 0]])
+    #src = np.float32([[200, 720], [1100, 720], [595, 450], [685, 450]])
+    #dst = np.float32([[300, 720], [980, 720], [300, 0], [980, 0]])
+    src = np.float32([[200, 720], [595, 450], [685, 450], [1100, 720]])
+    dst = np.float32([[300, 720], [300, 0], [980, 0], [980, 720]])
     m = cv2.getPerspectiveTransform(src, dst)
     m_inv = cv2.getPerspectiveTransform(dst, src)
     warped = cv2.warpPerspective(img, m, img_size, flags=cv2.INTER_LINEAR)
@@ -775,7 +785,7 @@ if __name__ == "__main__":
     # End of the FOR loop of a sequence of test images
 
     # Process video
-    video_input = VideoFileClip("videos/project_video.mp4").subclip(35, 45)
+    video_input = VideoFileClip("videos/project_video.mp4")#.subclip(35, 45)  # Subclip for most challenging interval
     video_output = 'videos/OUTPUT_VIDEO.mp4'
 
     output_clip = video_input.fl_image(process_image)
