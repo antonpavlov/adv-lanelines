@@ -87,16 +87,11 @@ def select_yellow(image):
     Threshold to select a yellow color objects
     :param image: Undistorted image
     :return: Thresholded image
-    Ref: Udacity review
+    Ref: Udacity reviewer suggestion
     """
     hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-    #lower = np.array([20, 60, 60])
-    lower = np.array([20, 100, 100]) # better
-    #lower = np.array([23, 60, 60])
-    #upper = np.array([38, 174, 250])
-    #upper = np.array([110, 174, 250])
-    upper = np.array([50, 255, 255]) # better
-    #upper = np.array([40, 150, 255])
+    lower = np.array([20, 60, 60])
+    upper = np.array([110, 174, 250])
     mask = cv2.inRange(hsv, lower, upper)
     return mask
 
@@ -106,10 +101,9 @@ def select_white(image):
     Threshold to select a white color objects
     :param image: Undistorted image
     :return: Thresholded image
-    Ref: Udacity review
+    Ref: Udacity reviewer suggestion
     """
-    lower = np.array([202, 202, 202])
-    #lower = np.array([190, 190, 190])
+    lower = np.array([210, 210, 210])
     upper = np.array([255, 255, 255])
     mask = cv2.inRange(image, lower, upper)
     return mask
@@ -236,43 +230,21 @@ def all_combined_threshold(input_image):
     :return: Combined binary image
     Ref: Course notes
     """
-    kernel_size = 7
+    # Apply Gausiian blur to the input image
+    kernel_size = 5
     input_image = cv2.GaussianBlur(input_image, (kernel_size, kernel_size), 0)
+
     # Sobel kernel size
     ksize = 5  # Should be an odd number to smooth a gradient
 
     # Apply threshold functions
     absolute_binaryX = absolute_sobel_threshold(input_image, orient='x', thresh=(20, 255)) # thresh=(30, 255)
-    absolute_binaryY = absolute_sobel_threshold(input_image, orient='y', thresh=(20, 255)) # thresh=(30, 255)
-    magnitude_binary = magnitude_threshold(input_image, sobel_kernel=ksize, mag_thresh=(30, 200)) # mag_thresh=(60, 255)
+    absolute_binaryY = absolute_sobel_threshold(input_image, orient='y', thresh=(30, 255)) # thresh=(30, 255)
+    magnitude_binary = magnitude_threshold(input_image, sobel_kernel=ksize, mag_thresh=(70, 255)) # mag_thresh=(60, 255)
     direction_binary = direction_threshold(input_image, sobel_kernel=ksize, thresh=(0.7, 1.3))
-
-    #hlscolor_binary = hlscolor_threshold(input_image, thresh=(170, 255))
-
-    # Combine threshold results in one binary image
-    #combine_all_binary = np.zeros_like(dir_binary)
-    #combine_all_binary[(absolute_binary == 1 | ((magnitude_binary == 1)
-    #                                            & (direction_binary == 1))) | hlscolor_binary == 1] = 1
-
-    # Gaussian Blur
-    #kernel_size = 5
-    #img = cv2.GaussianBlur(input_image, (kernel_size, kernel_size), 0)
-    # Sobel kernel size (choose a larger odd number to smooth gradient measurements)
-    #ksize = 5
-    # Apply Sobel on x-axis
-    #grad_x_binary = absolute_sobel_threshold(img, orient='x', thresh=(10, 255))
-    # Apply Sobel on y-axis
-    #grad_y_binary = absolute_sobel_threshold(img, orient='y', thresh=(60, 255))
-    # Apply Sobel x and y, compute the magnitude of the gradient and apply a threshold
-    #mag_binary = magnitude_threshold(img, sobel_kernel=ksize, mag_thresh=(40, 255))
-    # Apply Sobel x and y, computes the direction of the gradient and apply a threshold
-    #dir_binary = direction_threshold(img, sobel_kernel=ksize, thresh=(0.65, 1.05))
 
     # Combine the thresholds
     combine_all_binary = np.zeros_like(direction_binary)
-    #combine_all_binary[((grad_x_binary == 1) & (grad_y_binary == 1)) | ((mag_binary == 1) & (dir_binary == 1))]
-    #combine_all_binary[((absolute_binaryX == 1) | (absolute_binaryY == 1)) & ((magnitude_binary == 1) | (direction_binary == 1))]
-
     combine_all_binary[(absolute_binaryX == 1 | ((absolute_binaryY == 1)
                                                 & (direction_binary == 1))) | magnitude_binary == 1] = 1
     return combine_all_binary
@@ -285,17 +257,31 @@ def combined_color(input_image):
     :return: Combined binary image
     Ref: Course notes
     """
-    hls_binary = hlscolor_threshold(input_image, thresh=(160, 255))
+    # Apply a Contrast Limited Adaptive Histogram Equalization
+    # Ref: opencv2 documentation
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    lab = cv2.cvtColor(input_image, cv2.COLOR_BGR2LAB)  # convert from BGR to LAB color space
+    l, a, b = cv2.split(lab)  # split on 3 different channels
+    l2 = clahe.apply(l)  # apply CLAHE to the L-channel
+    lab = cv2.merge((l2, a, b))  # merge channels
+    input_image = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+    # Calculate thresholds color and in HLS colorspace
+    hls_binary = hlscolor_threshold(input_image, thresh=(180, 255))
     color_binary = color_threshold(input_image)
 
     # Combine the thresholds
     combine_all_binary = np.zeros_like(color_binary)
     combine_all_binary[(hls_binary == 1) | (color_binary == 1)] = 1
-
     return combine_all_binary
 
 
 def mega_thresh(input_image):
+    """
+    Call all thresholds from here
+    :param input_image: Undistorted image
+    :return: Combined binary image from all thresholds
+    """
     all_sobel = all_combined_threshold(input_image)
     all_color = combined_color(input_image)
     combined_binary = np.zeros_like(all_color)
@@ -311,10 +297,8 @@ def perspective_warp(img):
     Ref: https://github.com/georgesung/advanced_lane_detection
     """
     img_size = (img.shape[1], img.shape[0])
-    #src = np.float32([[200, 720], [1100, 720], [595, 450], [685, 450]])
-    #dst = np.float32([[300, 720], [980, 720], [300, 0], [980, 0]])
-    src = np.float32([[200, 720], [595, 450], [685, 450], [1100, 720]])
-    dst = np.float32([[300, 720], [300, 0], [980, 0], [980, 720]])
+    src = np.float32([[200, 720], [1100, 720], [595, 450], [685, 450]])
+    dst = np.float32([[300, 720], [980, 720], [300, 0], [980, 0]])
     m = cv2.getPerspectiveTransform(src, dst)
     m_inv = cv2.getPerspectiveTransform(dst, src)
     warped = cv2.warpPerspective(img, m, img_size, flags=cv2.INTER_LINEAR)
@@ -412,9 +396,13 @@ def find_lanes(binary_warped):
 
 
 def find_lanes_secondary(binary_warped, left_fit, right_fit):
-    # Assume you now have a new warped binary image
-    # from the next frame of video (also called "binary_warped")
-    # It's now much easier to find line pixels!
+    """
+    Once detected in find_lanes road markings are propagated in this function: no need for sliding window.
+    :param binary_warped: Binary warped image
+    :param left_fit: Previously detected left line
+    :param right_fit: Previously detected right line
+    :return: Binary image with lines and other parameters
+    """
     nonzero = binary_warped.nonzero()
     nonzeroy = np.array(nonzero[0])
     nonzerox = np.array(nonzero[1])
@@ -444,24 +432,10 @@ def find_lanes_secondary(binary_warped, left_fit, right_fit):
 
     # Create an image to draw on and an image to show the selection window
     out_img = np.dstack((binary_warped, binary_warped, binary_warped)) * 255
-    #window_img = np.zeros_like(out_img)
+
     # Color in left and right line pixels
     out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
     out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
-
-    ## Generate a polygon to illustrate the search window area
-    # And recast the x and y points into usable format for cv2.fillPoly()
-    #left_line_window1 = np.array([np.transpose(np.vstack([left_fitx - margin, ploty]))])
-    #left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx + margin, ploty])))])
-    #left_line_pts = np.hstack((left_line_window1, left_line_window2))
-    #right_line_window1 = np.array([np.transpose(np.vstack([right_fitx - margin, ploty]))])
-    #right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx + margin, ploty])))])
-    #right_line_pts = np.hstack((right_line_window1, right_line_window2))
-
-    # Draw the lane onto the warped blank image
-    #cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
-    #cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
-    #result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
     return out_img, left_fitx, right_fitx, ploty, left_fit, right_fit
 
 
@@ -561,7 +535,6 @@ def process_image(image):
     """
     global videoFlag
     undist_image = cv2.undistort(image, mtx, dist, None, mtx)
-    #combined_binary = all_combined_threshold(undist_image)
     combined_binary = mega_thresh(undist_image)
     warped_image, M, Minv = perspective_warp(combined_binary)
 
@@ -595,8 +568,8 @@ global mtx, dist, videoFlag
 
 if __name__ == "__main__":
 
-    DEBUG = True  # Save all intermediate images
-    videoFlag = False
+    DEBUG = False  # Save all intermediate images
+    videoFlag = False  # Do NOT change that flag
 
     # Calibrate camera
     mtx, dist = calibration()
